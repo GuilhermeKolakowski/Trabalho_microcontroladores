@@ -9,7 +9,7 @@
 #include <util/delay.h>
 
 #define tam_string 100
-//exemplo2
+//exemplo3
 char mensagem_enviada[tam_string]= "";
 char mensagem_recebida[tam_string]= "";
 
