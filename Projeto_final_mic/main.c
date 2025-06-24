@@ -9,7 +9,7 @@
 #include <util/delay.h>
 
 #define tam_string 100
-
+//exemplo
 char mensagem_enviada[tam_string]= "";
 char mensagem_recebida[tam_string]= "";
 
@@ -19,7 +19,7 @@ uint8_t select_sentido = 1;
 void enviar_mensagem(const char *mensagem_enviada) {
 	for (int i = 0; i < tam_string; i++) {
 		while ((UCSR0A & (1 << UDRE0)) == 0) {
-			// Espera até o buffer estar pronto para envio
+			// Espera atï¿½ o buffer estar pronto para envio
 		}
 
 		if (mensagem_enviada[i] == 0) {
@@ -73,7 +73,7 @@ void set_dutyB(uint8_t porcentagem) {
 
 int main(void) {
 
-	// PD5 e PD6 como saída
+	// PD5 e PD6 como saï¿½da
 	DDRD |= (1 << DDD6) | (1 << DDD5);
 
 	// PWM Timer0 - Fast PWM
@@ -81,11 +81,11 @@ int main(void) {
 	TCCR0B |= (1 << CS01) | (1 << CS00); // Prescaler 64 (976 Hz)
 
 
-	//Comunicação serial
-	UBRR0 = 103; //CONFIGURANDO BAUD RATE = 9600 pois u2x0 é 0
+	//Comunicaï¿½ï¿½o serial
+	UBRR0 = 103; //CONFIGURANDO BAUD RATE = 9600 pois u2x0 ï¿½ 0
 	UCSR0A = 0; // U2X0 = 0 (AFETA O BAUDRATE) se U2X0 = 1 muda a formula e pega metade da frequencia
 	UCSR0B = (1<<RXEN0) | (1<<TXEN0); // 0b00011000
-	UCSR0C = 0b00000110; //00 para setar assincrono. UPM1 E UMP0 desligados. USBS mexe no stopbit, final da informação longo ou curto. Setando UCsZ1 e 0 para 8bits. UCPOLmodo assincrono é 0
+	UCSR0C = 0b00000110; //00 para setar assincrono. UPM1 E UMP0 desligados. USBS mexe no stopbit, final da informaï¿½ï¿½o longo ou curto. Setando UCsZ1 e 0 para 8bits. UCPOLmodo assincrono ï¿½ 0
 	
 	while (1) {
 		if (select_sentido == 0) {
