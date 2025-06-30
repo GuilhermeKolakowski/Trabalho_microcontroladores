@@ -7,19 +7,20 @@
 #define F_CPU 16000000
 #include <xc.h>
 #include <util/delay.h>
+#include <string.h>
 
 #define tam_string 100
-//exemplo3
 char mensagem_enviada[tam_string]= "";
 char mensagem_recebida[tam_string]= "";
 
+uint8_t menu_exibido = 0;
 uint8_t select_sentido = 1;
 
 // ----------- UART -----------
 void enviar_mensagem(const char *mensagem_enviada) {
 	for (int i = 0; i < tam_string; i++) {
 		while ((UCSR0A & (1 << UDRE0)) == 0) {
-			// Espera at� o buffer estar pronto para envio
+			// Espera at? o buffer estar pronto para envio
 		}
 
 		if (mensagem_enviada[i] == 0) {
@@ -70,10 +71,17 @@ void set_dutyB(uint8_t porcentagem) {
 	OCR0B = (porcentagem * 255) / 100;
 }
 
+void exibir_menu() {
+	enviar_mensagem("----- MENU -----");
+	enviar_mensagem("1. Selecionar sentido (0 = A | 1 = B)");
+	enviar_mensagem("2. Setar PWM (0 a 100)");
+	enviar_mensagem("3. Exibir RPM e PWM atual");
+	enviar_mensagem("Digite uma opcao:");
+}
 
 int main(void) {
 
-	// PD5 e PD6 como sa�da
+	// PD5 e PD6 como saida
 	DDRD |= (1 << DDD6) | (1 << DDD5);
 
 	// PWM Timer0 - Fast PWM
@@ -81,13 +89,17 @@ int main(void) {
 	TCCR0B |= (1 << CS01) | (1 << CS00); // Prescaler 64 (976 Hz)
 
 
-	//Comunica��o serial
-	UBRR0 = 103; //CONFIGURANDO BAUD RATE = 9600 pois u2x0 � 0
+	//Comunicacao serial
+	UBRR0 = 103; //CONFIGURANDO BAUD RATE = 9600 pois u2x0 ? 0
 	UCSR0A = 0; // U2X0 = 0 (AFETA O BAUDRATE) se U2X0 = 1 muda a formula e pega metade da frequencia
 	UCSR0B = (1<<RXEN0) | (1<<TXEN0); // 0b00011000
-	UCSR0C = 0b00000110; //00 para setar assincrono. UPM1 E UMP0 desligados. USBS mexe no stopbit, final da informa��o longo ou curto. Setando UCsZ1 e 0 para 8bits. UCPOLmodo assincrono � 0
+	UCSR0C = 0b00000110; //00 para setar assincrono. UPM1 E UMP0 desligados. USBS mexe no stopbit, final da informa??o longo ou curto. Setando UCsZ1 e 0 para 8bits. UCPOLmodo assincrono ? 0
 	
 	while (1) {
+		if(menu_exibido == 0){ //exibir o menu 1 vez
+			exibir_menu();
+			menu_exibido = 1;
+		}
 		if (select_sentido == 0) {
 			ativar_pwmA();
 			set_dutyA(50);
