@@ -1,6 +1,7 @@
 #define F_CPU 16000000
 #include <xc.h>
 #include <util/delay.h>
+<<<<<<< HEAD
 #include <string.h>
 #include <stdio.h>
 <<<<<<< HEAD
@@ -12,22 +13,37 @@ char mensagem_enviada[tam_string] = "";
 uint8_t duty = 0;
 uint8_t canal_pwm_ativo = 0; // 1 = PWM A, 2 = PWM B
 =======
+=======
+#include <stdio.h>
+#include <stdlib.h>
+#include <avr/interrupt.h>
+>>>>>>> 978d6528f4a2da1332d857eccf35c37ad335f5b1
 
 #define tam_string 100
-char mensagem_enviada[tam_string]= "";
-char mensagem_recebida[tam_string]= "";
+char mensagem_enviada[tam_string] = "";
 
+<<<<<<< HEAD
 uint8_t menu_exibido = 0;
 uint8_t estado_menu = 0;
 uint8_t duty = 0;
 >>>>>>> 5e40fbae7ac6e304a99ded7e912e7210879dfe8a
+=======
+volatile uint16_t contagem_pulsos = 0;
+uint8_t duty = 0;
+uint8_t canal_pwm_ativo = 0; // 1 = PWM A, 2 = PWM B
+>>>>>>> 978d6528f4a2da1332d857eccf35c37ad335f5b1
 
 // ----------- UART -----------
 
 void enviar_mensagem(const char *mensagem_enviada) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	for (int i = 0; i < tam_string; i++) {
 		while ((UCSR0A & (1 << UDRE0)) == 0) {}
+=======
+	for (int i = 0; i < tam_string; i++) {
+		while ((UCSR0A & (1 << UDRE0)) == 0);
+>>>>>>> 978d6528f4a2da1332d857eccf35c37ad335f5b1
 		if (mensagem_enviada[i] == 0) break;
 		UDR0 = mensagem_enviada[i];
 	}
@@ -41,20 +57,31 @@ void receber_mensagem() {
 	char caractere;
 
 	while (1) {
+<<<<<<< HEAD
 		// Espera atÃ© receber um dado
+=======
+>>>>>>> 978d6528f4a2da1332d857eccf35c37ad335f5b1
 		while (!(UCSR0A & (1 << RXC0)));
 
 		caractere = UDR0;
 
+<<<<<<< HEAD
 		// Se for Enter ('\n' ou '\r'), encerra a string
 		if (caractere == '\n' || caractere == '\r') {
 			// Ignora enter duplicado (ex: \r\n)
 			if (i == 0) continue; // ignora enter sem mensagem
+=======
+		if (caractere == '\n' || caractere == '\r') {
+			if (i == 0) continue;
+>>>>>>> 978d6528f4a2da1332d857eccf35c37ad335f5b1
 			buffer[i] = '\0';
 			break;
 		}
 
+<<<<<<< HEAD
 		// Armazena no buffer se nÃ£o ultrapassar o tamanho
+=======
+>>>>>>> 978d6528f4a2da1332d857eccf35c37ad335f5b1
 		if (i < tam_string - 1) {
 			buffer[i++] = caractere;
 		}
@@ -62,6 +89,7 @@ void receber_mensagem() {
 
 	enviar_mensagem("Mensagem recebida:");
 	enviar_mensagem(buffer);
+<<<<<<< HEAD
 =======
     for (int i = 0; i < tam_string; i++) {
         while ((UCSR0A & (1 << UDRE0)) == 0) {}
@@ -84,6 +112,44 @@ char receber_mensagem(){
 // ----------- PWM CONFIG -----------
 void ativar_pwmA() {
 <<<<<<< HEAD
+=======
+}
+
+// ----------- ENCODER e RPM -----------
+
+ISR(INT0_vect) {
+	contagem_pulsos++;
+}
+
+ISR(TIMER1_COMPA_vect) {
+	char buffer[32];
+	uint16_t rpm = contagem_pulsos * 60;
+	contagem_pulsos = 0;
+
+	sprintf(buffer, "RPM: %u", rpm);
+	enviar_mensagem(buffer);
+}
+
+void configurar_encoder() {
+	DDRD &= ~(1 << PD4);    // PD4 como entrada
+	PORTD |= (1 << PD4);    // Pull-up ativado
+
+	EICRA |= (1 << ISC01);  // Interrupção na borda de descida
+	EICRA &= ~(1 << ISC00);
+	EIMSK |= (1 << INT0);   // Habilita INT0
+}
+
+void configurar_timer1_para_1s() {
+	TCCR1A = 0;
+	TCCR1B = (1 << WGM12) | (1 << CS12) | (1 << CS10); // Modo CTC, Prescaler 1024
+	OCR1A = 15624; // (16MHz / 1024) * 1s - 1
+	TIMSK1 |= (1 << OCIE1A); // Interrupção por comparação
+}
+
+// ----------- PWM -----------
+
+void ativar_pwmA() {
+>>>>>>> 978d6528f4a2da1332d857eccf35c37ad335f5b1
 	TCCR0A |= (1 << COM0A1);
 	TCCR0A &= ~(1 << COM0B1);
 	PORTD &= ~(1 << PD5); // Garante 0V no outro canal
@@ -140,6 +206,7 @@ void set_dutyB(uint8_t porcentagem) {
 >>>>>>> 5e40fbae7ac6e304a99ded7e912e7210879dfe8a
 }
 
+<<<<<<< HEAD
 void exibir_menu() {
     enviar_mensagem("\n");
     enviar_mensagem("----- MENU -----");
@@ -302,3 +369,33 @@ int main(void) {
     }
 >>>>>>> 5e40fbae7ac6e304a99ded7e912e7210879dfe8a
 }
+=======
+int main(void) {
+	// PWM pinos como saída
+	DDRD |= (1 << PD6) | (1 << PD5);
+
+	// UART
+	UBRR0 = 103; // 9600 baud
+	UCSR0A = 0;
+	UCSR0B = (1 << RXEN0) | (1 << TXEN0);
+	UCSR0C = 0b00000110;
+
+	// PWM modo Fast PWM, Prescaler 64
+	TCCR0A |= (1 << WGM01) | (1 << WGM00);
+	TCCR0B |= (1 << CS01) | (1 << CS00);
+
+	// Configurações
+	configurar_encoder();
+	configurar_timer1_para_1s();
+
+	// Inicializa PWM
+	ativar_pwmA();
+	set_dutyA(50);
+
+	sei();
+
+	while (1) {
+		receber_mensagem(); // Aguarda e exibe mensagens do usuário
+	}
+}
+>>>>>>> 978d6528f4a2da1332d857eccf35c37ad335f5b1
