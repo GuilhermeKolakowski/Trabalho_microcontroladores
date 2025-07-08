@@ -68,7 +68,7 @@ void configurar_encoder() {
 	DDRD &= ~(1 << PD4);    // PD4 como entrada
 	PORTD |= (1 << PD4);    // Pull-up ativado
 
-	EICRA |= (1 << ISC01);  // Interrupção na borda de descida
+	EICRA |= (1 << ISC01);  // Interrup  o na borda de descida
 	EICRA &= ~(1 << ISC00);
 	EIMSK |= (1 << INT0);   // Habilita INT0
 }
@@ -77,7 +77,7 @@ void configurar_timer1_para_1s() {
 	TCCR1A = 0;
 	TCCR1B = (1 << WGM12) | (1 << CS12) | (1 << CS10); // Modo CTC, Prescaler 1024
 	OCR1A = 15624; // (16MHz / 1024) * 1s - 1
-	TIMSK1 |= (1 << OCIE1A); // Interrupção por comparação
+	TIMSK1 |= (1 << OCIE1A); // Interrup  o por compara  o
 }
 
 // ----------- PWM -----------
@@ -106,8 +106,10 @@ void set_dutyB(uint8_t porcentagem) {
 	OCR0B = (porcentagem * 255) / 100;
 }
 
+// ----------- MAIN -----------
+
 int main(void) {
-	// PWM pinos como saída
+	// PWM pinos como sa da
 	DDRD |= (1 << PD6) | (1 << PD5);
 
 	// UART
@@ -120,17 +122,18 @@ int main(void) {
 	TCCR0A |= (1 << WGM01) | (1 << WGM00);
 	TCCR0B |= (1 << CS01) | (1 << CS00);
 
-	// Configurações
+	// Configura  es
 	configurar_encoder();
 	configurar_timer1_para_1s();
 
 	// Inicializa PWM
 	ativar_pwmA();
 	set_dutyA(50);
-///teste raian
+
+	// Habilita interrup  es globais
 	sei();
 
 	while (1) {
-		receber_mensagem(); // Aguarda e exibe mensagens do usuário
+		receber_mensagem(); // Aguarda e exibe mensagens do usu rio
 	}
 }
