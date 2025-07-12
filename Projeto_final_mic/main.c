@@ -1,65 +1,63 @@
 #define F_CPU 16000000
-#include <xc.h>
-#include <util/delay.h>
-#include <stdio.h>      // sprintf/snprintf
-#include <string.h>     // strcmp, strlen etc
-#include <stdlib.h>     //  atoi
-#include <avr/interrupt.h>
+#include <xc.h>                    
+#include <util/delay.h>          
+#include <stdio.h>                // Para sprintf, snprintf
+#include <string.h>               // Para manipulação de strings (ex: strcmp)
+#include <stdlib.h>               // Para conversão de string para inteiro (atoi)
+#include <avr/interrupt.h>       
 
 #define tam_string 100
-char mensagem_enviada[tam_string] = "";
 
-volatile uint16_t contagem_pulsos = 0;   // Contador de pulsos do encoder
-char mensagem_recebida[tam_string] = ""; // Armazena mensagem recebida via UART
-uint8_t i_rx = 0;                        // Índice de leitura UART
-uint8_t duty = 0;                        // Duty cycle atual do PWM
+char mensagem_enviada[tam_string] = "";        // Buffer para mensagens que serão enviadas pela UART
+char mensagem_recebida[tam_string] = "";       // Buffer para armazenar mensagens recebidas pela UART
 
-volatile uint8_t tempo_passou = 0;       // Variavel que indica que 1 segundo se passou
+volatile uint16_t contagem_pulsos = 0;         // Contador de pulsos do encoder (para medir RPM)
+uint8_t i_rx = 0;                              // Índice de recepção de caracteres UART
+uint8_t duty = 0;                              // Armazena o duty cycle atual (0–100%)
+volatile uint8_t tempo_passou = 0;             // Flag para sinalizar que 1 segundo se passou
 
-// ---------- Função para enviar mensagens via UART ----------
+// ---------- Enviar mensagem via UART ----------
 void enviar_mensagem(const char *mensagem_enviada) {
 	for (int i = 0; i < tam_string; i++) {
-		while ((UCSR0A & (1 << UDRE0)) == 0); // Espera o registrador estar pronto
-		if (mensagem_enviada[i] == 0) break;  // Fim da string
+		while ((UCSR0A & (1 << UDRE0)) == 0); // Espera o registrador de envio estar pronto
+		if (mensagem_enviada[i] == 0) break;  // Encerra se final da string
 		UDR0 = mensagem_enviada[i];          // Envia caractere
 	}
-	UDR0 = '\n'; // Envia nova linha após a mensagem
+	UDR0 = '\n'; // Finaliza com quebra de linha
 }
 
-// ---------- Recepção UART ----------
+// ---------- Verificar e processar comandos UART ----------
 void verificar_recepcao_serial() {
-	if (UCSR0A & (1 << RXC0)) {   // Verifica se chegou dado
-		char c = UDR0;            // Lê caractere recebido
+	if (UCSR0A & (1 << RXC0)) {       // Verifica se há caractere recebido
+		char c = UDR0;                // Lê o caractere
 
-		// Fim da mensagem
-		if (c == '\n' || c == '\r') {
-			mensagem_recebida[i_rx] = '\0'; // Finaliza string
-			i_rx = 0;
+		if (c == '\n' || c == '\r') { // Se for fim de linha, processa a string
+			mensagem_recebida[i_rx] = '\0'; // Finaliza a string com caractere nulo
+			i_rx = 0;                        // Reseta índice do buffer
 
-			// Se a string for vazia, ignora
+			// Ignora comandos vazios
 			if (mensagem_recebida[0] == '\0') {
-				// Nada a fazer
 			}
-			// Comando: DIREITA
+			// Comando para ativar PWM A (motor para direita)
 			else if (strcmp(mensagem_recebida, "DIREITA") == 0) {
-				ativar_pwmA();         // Ativa canal A
-				set_dutyA(duty);       // Aplica duty atual
+				ativar_pwmA();
+				set_dutyA(duty);
 				enviar_mensagem("PWM A ativado (DIREITA)");
 			}
-			// Comando: ESQUERDA
+			// Comando para ativar PWM B (motor para esquerda)
 			else if (strcmp(mensagem_recebida, "ESQUERDA") == 0) {
-				ativar_pwmB();         // Ativa canal B
-				set_dutyB(duty);       // Aplica duty atual
+				ativar_pwmB();
+				set_dutyB(duty);
 				enviar_mensagem("PWM B ativado (ESQUERDA)");
 			}
-			// Comando: DUTY XXX
+			// Comando para alterar o duty cycle
 			else if (strncmp(mensagem_recebida, "DUTY", 4) == 0) {
-				char *duty_str = &mensagem_recebida[4];
+				char *duty_str = &mensagem_recebida[4]; // Pega o que vem após "DUTY"
+				while (*duty_str == ' ') duty_str++;    // Remove espaços extras
 
-				while (*duty_str == ' ') duty_str++; // Ignora espaços após "DUTY"
+				uint8_t valido = 1; // Flag de verificação
 
-				// Valida se a string contém apenas dígitos
-				uint8_t valido = 1;
+				// Verifica se todos os caracteres são dígitos numéricos
 				for (uint8_t i = 0; duty_str[i] != '\0'; i++) {
 					if (duty_str[i] < '0' || duty_str[i] > '9') {
 						valido = 0;
@@ -67,10 +65,9 @@ void verificar_recepcao_serial() {
 					}
 				}
 
-				// Converte string para inteiro
-				int novo_duty = atoi(duty_str);
+				int novo_duty = atoi(duty_str); // Converte string para inteiro
 
-				// Verifica se está no intervalo permitido
+				// Verifica se duty está no intervalo permitido
 				if (valido && novo_duty >= 0 && novo_duty <= 100) {
 					duty = novo_duty;
 					set_dutyA(duty);
@@ -78,18 +75,18 @@ void verificar_recepcao_serial() {
 
 					char resposta[32];
 					snprintf(resposta, sizeof(resposta), "Duty atualizado: %u%%", duty);
-					enviar_mensagem(resposta);
+					enviar_mensagem(resposta); // Confirma ao usuário
 					} else {
-					enviar_mensagem("Duty invalido (0-100)");
+					enviar_mensagem("Duty invalido (0-100)"); // Mensagem de erro
 				}
 			}
-			// Comando não reconhecido
+			// Qualquer outro comando é inválido
 			else {
 				enviar_mensagem("Comando invalido");
 			}
 		}
 		else {
-			// Armazena caractere na string se ainda houver espaço
+			// Se ainda está recebendo caracteres, armazena no buffer
 			if (i_rx < tam_string - 1) {
 				mensagem_recebida[i_rx++] = c;
 			}
@@ -97,86 +94,85 @@ void verificar_recepcao_serial() {
 	}
 }
 
-// ---------- Interrupção pulso do encoder ----------
+// ---------- Interrupção externa INT0 (encoder) ----------
 ISR(INT0_vect) {
-	contagem_pulsos++; // Incrementa contador a cada pulso
+	contagem_pulsos++; // Incrementa a contagem de pulsos a cada transição detectada
 }
 
-// ---------- Interrupção: Timer1 a cada 1 segundo ----------
+// ---------- Interrupção do Timer1 (a cada 1 segundo) ----------
 ISR(TIMER1_COMPA_vect) {
-	tempo_passou = 1; // Marca que 1 segundo passou
+	tempo_passou = 1;
 }
 
-// ---------- PWM ----------
+// ---------- Ativar canal PWM A (PD6) ----------
 void ativar_pwmA() {
-	TCCR0A |= (1 << COM0A1);     // Ativa canal A
-	TCCR0A &= ~(1 << COM0B1);    // Desativa canal B
-	PORTD &= ~(1 << PD5);        // Garante PD5 em nível baixo
+	TCCR0A |= (1 << COM0A1);     // Ativa saída PWM A (PD6)
+	TCCR0A &= ~(1 << COM0B1);    // Desativa saída B
+	PORTD &= ~(1 << PD5);        // Força PD5 em nível baixo (B desativado)
 }
 
+// ---------- Ativar canal PWM B (PD5) ----------
 void ativar_pwmB() {
-	TCCR0A |= (1 << COM0B1);     // Ativa canal B
-	TCCR0A &= ~(1 << COM0A1);    // Desativa canal A
-	PORTD &= ~(1 << PD6);        // Garante PD6 em nível baixo
+	TCCR0A |= (1 << COM0B1);     // Ativa saída PWM B (PD5)
+	TCCR0A &= ~(1 << COM0A1);    // Desativa saída A
+	PORTD &= ~(1 << PD6);        // Força PD6 em nível baixo (A desativado)
 }
 
+// ---------- Define duty cycle do canal A ----------
 void set_dutyA(uint8_t porcentagem) {
 	if (porcentagem > 100) porcentagem = 100;
-	OCR0A = (porcentagem * 255) / 100; // Converte porcentagem para valor PWM
+	OCR0A = (porcentagem * 255) / 100; // Conversão percentual para 8 bits (0–255)
 }
 
+// ---------- Define duty cycle do canal B ----------
 void set_dutyB(uint8_t porcentagem) {
 	if (porcentagem > 100) porcentagem = 100;
 	OCR0B = (porcentagem * 255) / 100;
 }
 
-// ---------- Função principal ----------
-int main(void) {
-	DDRD |= (1 << PD5) | (1 << PD6); //PD5 e PD6 como saída
 
-	UBRR0 = 103; //9600 baud
+int main(void) {
+	// Configura os pinos PD5 e PD6 como saídas
+	DDRD |= (1 << PD5) | (1 << PD6);
+
+	UBRR0 = 103;                          // Baud rate 9600 para F_CPU = 16MHz
 	UCSR0A = 0;
 	UCSR0B = (1 << RXEN0) | (1 << TXEN0); // Habilita RX e TX
-	UCSR0C = 0b00000110;                  // 8 bits, 1 stop, sem paridade
+	UCSR0C = 0b00000110;                  // Formato: 8 bits, 1 stop, sem paridade
 
-	
-	TCCR0A |= (1 << WGM01) | (1 << WGM00); // Configura Timer0 para Fast PWM
-	TCCR0B |= (1 << CS01) | (1 << CS00); // Prescaler 64
+	TCCR0A |= (1 << WGM01) | (1 << WGM00);    // Modo Fast PWM
+	TCCR0B |= (1 << CS01) | (1 << CS00);      // Prescaler 64
 
-	
-	DDRD &= ~(1 << PD2); // PD2 como entrada
-	PORTD |= (1 << PD2); // Pull-up
-	EICRA |= (1 << ISC01); // Borda de descida
+	DDRD &= ~(1 << PD2);        // PD2 como entrada
+	PORTD |= (1 << PD2);        // Habilita pull-up
+	EICRA |= (1 << ISC01);      // Interrupção na borda de descida
 	EICRA &= ~(1 << ISC00);
-	EIMSK |= (1 << INT0);  // Habilita INT0
+	EIMSK |= (1 << INT0);       // Habilita interrupção externa INT0
 
-	// Configura Timer1 para interrupção a cada 1 segundo
-	TCCR1B |= (1 << WGM12);              // CTC
-	TCCR1B |= (1 << CS12) | (1 << CS10); // Prescaler 1024
-	OCR1A = 15624;                       // 16MHz / 1024 = 15625 Hz ? 1s
-	TIMSK1 |= (1 << OCIE1A);             // Habilita interrupção
+	TCCR1B |= (1 << WGM12);                    // Modo CTC
+	TCCR1B |= (1 << CS12) | (1 << CS10);       // Prescaler 1024
+	OCR1A = 15624;                             // F_CPU / Prescaler = 16MHz / 1024 = 15625 por segundo
+	TIMSK1 |= (1 << OCIE1A);                   // Habilita interrupção de comparação
 
 	sei(); // Habilita interrupções globais
 
-	// Configura PWM com duty inicial
 	duty = 0;
 	set_dutyA(duty);
 	set_dutyB(duty);
 
-	// Loop principal
 	while (1) {
-		// Verifica se 1 segundo se passou
 		if (tempo_passou == 1) {
 			tempo_passou = 0;
 
-			uint16_t rpm = contagem_pulsos * 60; // RPM = voltas/s * 60
-			contagem_pulsos = 0;
+			uint16_t rpm = contagem_pulsos * 60; // Converte pulsos por segundo em RPM
+			contagem_pulsos = 0;                 // Zera contador para próxima contagem
 
 			char buffer[64];
 			snprintf(buffer, sizeof(buffer), "RPM:%u | Duty:%u%%", rpm, duty);
-			enviar_mensagem(buffer);
+			enviar_mensagem(buffer); // Envia dados via UART
 		}
 
-		verificar_recepcao_serial(); // Verifica entrada UART
+		// Checa se recebeu dados pela UART
+		verificar_recepcao_serial();
 	}
 }
